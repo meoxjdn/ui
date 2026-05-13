@@ -3,7 +3,7 @@ name: 云端一键解压并编译 NDK
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # 允许你手动点击按钮触发编译
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,28 +11,26 @@ jobs:
 
     steps:
     - name: 1. 检出代码 (获取 jni.zip)
-      uses: actions/checkout@v4  # 【大牛修复】已升级到最新的 v4
+      uses: actions/checkout@v4
 
     - name: 2. 解压源码包 (jni.zip)
       run: |
         echo "开始解压 jni.zip..."
-        # 直接解压到当前根目录。解压后当前目录就会出现一个 jni 文件夹
         unzip jni.zip
         echo "解压完成，当前目录结构如下："
         ls -la
 
-    - name: 3. 安装官方 NDK 环境 (r25b)
+    - name: 3. 安装官方 NDK 环境 (升级为 r26d 以适配 GlossHook)
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r25b
+        ndk-version: r26d  # 【关键修改】升级 NDK 版本解决 std::abort 符号缺失问题
 
     - name: 4. 执行 ndk-build 编译
       run: |
-        # 此时当前目录下已经有 jni 文件夹了，直接运行 ndk-build 即可
         ndk-build
 
     - name: 5. 打包生成的 .so 文件提供给你下载
-      uses: actions/upload-artifact@v4  # 【大牛修复】已升级到最新的 v4
+      uses: actions/upload-artifact@v4
       with:
         name: 编译成品-SO文件
-        path: libs/  # ndk-build 生成的 .so 文件默认会创建在 libs 文件夹下
+        path: libs/

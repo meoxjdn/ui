@@ -1,4 +1,4 @@
-name: 云端一键解压并编译 NDK
+name: 工业级全套件打包编译
 
 on:
   push:
@@ -10,27 +10,80 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 1. 检出代码 (获取 jni.zip)
+    - name: 1. 检出代码
       uses: actions/checkout@v4
 
-    - name: 2. 解压源码包 (jni.zip)
+    - name: 2. 解压源码包 (同时解压辅助和注入器)
       run: |
         echo "开始解压 jni.zip..."
-        unzip jni.zip
-        echo "解压完成，当前目录结构如下："
+        unzip -o jni.zip || true
+        
+        echo "开始解压 injector.zip..."
+        # 假设你把注入器压缩成了 injector.zip
+        unzip -o injector.zip || true
+        
+        echo "当前目录结构："
         ls -la
 
-    - name: 3. 安装官方 NDK 环境 (升级为 r26d 以适配 GlossHook)
+    - name: 3. 安装官方 NDK (r26d)
       uses: nttld/setup-ndk@v1
       with:
-        ndk-version: r26d  # 【关键修改】升级 NDK 版本解决 std::abort 符号缺失问题
+        ndk-version: r26d
 
-    - name: 4. 执行 ndk-build 编译
+    - name: 4. 编译 R3v 辅助模块 (libR3v.so)
       run: |
+        echo ">>> 开始编译辅助模块 <<<"
         ndk-build
+        echo "辅助模块编译完成！"
 
-    - name: 5. 打包生成的 .so 文件提供给你下载
+    - name: 5. 编译 Ptrace 注入器 (injector)
+      run: |
+        echo ">>> 开始编译注入器 <<<"
+        # 进入注入器的目录进行编译
+        cd Android-Ptrace-Injector-main
+        ndk-build
+        echo "注入器编译完成！"
+
+    - name: 6. 拼装终极部署套件 (Deploy Pack)
+      run: |
+        # 创建统一部署文件夹
+        mkdir -p deploy
+        
+        # 复制刚才编译好的 libR3v.so (NDK 默认输出在 libs/ 目录下)
+        cp libs/arm64-v8a/libR3v.so deploy/
+        
+        # 复制刚才编译好的注入器 (注意：注入器编译后一般叫 injector 或者 Injector)
+        # NDK 编译注入器通常输出在它自己目录的 libs 下
+        cp Android-Ptrace-Injector-main/libs/arm64-v8a/injector deploy/ || cp Android-Ptrace-Injector-main/libs/arm64-v8a/Injector deploy/
+        
+        # 生成一键注入脚本 run.sh
+        cat <<EOF > deploy/run.sh
+        #!/system/bin/sh
+        
+        # 自动获取当前脚本所在目录
+        curr_dir=\$(dirname "\$(readlink -f "\$0")")
+        
+        echo "====================================="
+        echo "  Ghost Core - 战术终端一键注入脚本"
+        echo "====================================="
+        
+        # 赋予最高执行权限
+        chmod 777 "\$curr_dir/injector"
+        chmod 777 "\$curr_dir/libR3v.so"
+        
+        echo "[*] 正在向 com.tencent.KiHan 注入载荷..."
+        
+        # 调用注入器执行注入 (-n 代表包名, -f 代表 so 路径)
+        "\$curr_dir/injector" -n com.tencent.KiHan -f "\$curr_dir/libR3v.so"
+        
+        echo "[+] 注入指令已下发，请返回游戏查看终端！"
+        EOF
+        
+        # 给脚本执行权限
+        chmod +x deploy/run.sh
+
+    - name: 7. 上传最终成品
       uses: actions/upload-artifact@v4
       with:
-        name: 编译成品-SO文件
-        path: libs/
+        name: Naruto_Hack_Pack_Full
+        path: deploy/

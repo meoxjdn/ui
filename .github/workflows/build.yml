@@ -1,0 +1,44 @@
+name: 云端一键解压并编译 NDK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # 允许你在网页上点按钮手动运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # 使用 GitHub 免费的 Linux 云服务器
+
+    steps:
+    - name: 1. 检出代码 (把你的 ZIP 拉取到云服务器)
+      uses: actions/checkout@v3
+
+    - name: 2. 解压源码包
+      # 【关键步】这里会自动用 linux 的 unzip 命令解压你的包
+      # 请把你上传的 zip 名字替换掉下面的 "jni.zip"
+      run: |
+        echo "开始解压..."
+        unzip 你的压缩包名字.zip -d my_source_code
+        echo "解压完成，当前目录结构如下："
+        ls -la my_source_code
+
+    - name: 3. 安装官方 NDK 环境 (r25b)
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25b
+
+    - name: 4. 执行 ndk-build 编译
+      run: |
+        # 进入解压后的目录。
+        # 注意：如果你的 jni 文件夹在解压后的某层子目录里，这里需要 cd 到对应的层级！
+        # 比如：cd my_source_code/你的项目名
+        cd my_source_code
+        
+        # 开始调用 ndk-build
+        ndk-build
+
+    - name: 5. 打包生成的 .so 文件提供给你下载
+      uses: actions/upload-artifact@v3
+      with:
+        name: 编译成品-SO文件
+        path: my_source_code/libs/ # NDK 编译出来的成品都在 libs 文件夹下
